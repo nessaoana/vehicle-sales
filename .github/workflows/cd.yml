@@ -9,6 +9,7 @@ on:
 permissions:
   contents: read
   packages: write
+  pull-requests: write
 
 jobs:
   docker:
@@ -41,4 +42,5 @@ jobs:
           "aws_region": "us-east-1",
           "assets_bucket_name": "vehicle-sales-assets"
         }
-    secrets: inherit
+    secrets:
+      LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
