@@ -1,8 +1,8 @@
-from src.infra.logging.formatter import DatadogLogConfig
+from src.infra.logging.formatter import LogConfig
 
 
 def test_logger_is_configured_once() -> None:
-    logger_config = DatadogLogConfig("vehicle-sales", "test")
+    logger_config = LogConfig("vehicle-sales", "test")
 
     first_logger = logger_config.get_logger()
     second_logger = logger_config.get_logger()
