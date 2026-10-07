@@ -90,7 +90,8 @@ jobs:
           "aws_region": "us-east-1",
           "assets_bucket_name": "vehicle-sales-assets"
         }
-    secrets: inherit
+    secrets:
+      LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
 
   create-pr:
     needs: [build, coverage-gate, sonar, infrastructure, terraform-plan]
