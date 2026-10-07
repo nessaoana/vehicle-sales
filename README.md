@@ -54,31 +54,26 @@ casos de uso de compra, listagem e webhook de pagamento.
 
 ## CI/CD
 
-O CI executa build Python, testes com cobertura mínima de 80%, análise SonarCloud,
-validação Terraform e `terraform plan` sem apply. Em branches diferentes de
-`main`, um Pull Request é criado automaticamente após o CI bem-sucedido.
+```mermaid
+flowchart LR
+	Push[Push ou PR] --> Tests[Build e testes<br/>cobertura ≥ 80%] --> Sonar[SonarCloud]
+	Push --> Plan[Terraform<br/>validate + plan]
+	Sonar --> Branch{Branch?}
+	Plan --> Branch
+	Branch -- outra --> PR[Abre PR para main]
+	Branch -- main --> Docker[Publica imagem<br/>no Docker Hub] --> Apply[Terraform apply<br/>no LocalStack]
+```
 
-O CD é acionado somente após o workflow `CI` terminar com sucesso na branch
-`main`. Ele publica a imagem `app` no Docker Hub e depois aplica o Terraform no
-LocalStack Cloud.
+O CI roda em pushes para qualquer branch e em PRs para `main`:
 
-Workflows reutilizáveis usados:
+- build e testes, com cobertura mínima de 80%;
+- análise no SonarCloud, que bloqueia a alteração se o quality gate falhar;
+- `terraform fmt`, `validate` e `plan`, sem apply.
 
-- `_reusable-build-python.yml`
-- `_reusable-sonar-python.yml`
-- `_reusable-dockerhub.yml`
-- `_reusable-terraform.yml`
-- `_reusable-create-pr.yml`
+Se o CI passar:
 
-Configure no GitHub:
+- **em outra branch**, um PR para `main` é aberto automaticamente;
+- **na `main`**, o CD publica a imagem no Docker Hub e aplica o Terraform no
+  LocalStack Cloud.
 
-- Repository variable `SONAR_ORG`
-- Repository variable `DOCKERHUB_USERNAME`
-- Secret `SONAR_TOKEN`
-- Secret `DOCKERHUB_TOKEN`
-- Secret `LOCALSTACK_AUTH_TOKEN`
-
-No SonarCloud, use o projeto `nessaoana_vehicle-sales` e desabilite Automatic
-Analysis para manter a análise via GitHub Actions. Para criação automática de
-PRs, habilite `Allow GitHub Actions to create and approve pull requests` nas
-configurações do repositório.
+Os jobs usam os workflows reutilizáveis de `fiap-soat-grupo36/reusable-actions`.
