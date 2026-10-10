@@ -41,6 +41,13 @@ class VehicleCoreClient:
             return None
         return Vehicle.model_validate(response.json())
 
+    def mark_as_sold(self, vehicle_id: int) -> None:
+        self._request(
+            "PATCH",
+            f"/vehicles/{vehicle_id}/availability",
+            json={"status": "sold", "active": False},
+        )
+
     def _request(
         self,
         method: str,

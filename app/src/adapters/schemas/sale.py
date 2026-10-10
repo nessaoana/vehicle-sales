@@ -2,6 +2,7 @@
 
 from datetime import date
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -27,6 +28,19 @@ class PurchaseRequest(BaseModel):
     @classmethod
     def validate_cpf(cls, value: str) -> str:
         return normalize_cpf(value)
+
+
+class PaymentWebhookRequest(BaseModel):
+    """Notification sent by the payment provider."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [{"payment_code": "98b337b9300c46b3bf12edc13f88a4a6", "status": "paid"}]
+        }
+    )
+
+    payment_code: str = Field(min_length=1, max_length=64)
+    status: Literal["paid", "cancelled"]
 
 
 class SaleResponse(BaseModel):

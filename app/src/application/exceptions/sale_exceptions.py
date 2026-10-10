@@ -7,3 +7,7 @@ class SaleNotFoundError(Exception):
 
 class VehicleAlreadyReservedError(Exception):
     """Raised when a vehicle already has a pending or confirmed sale."""
+
+
+class PaymentAlreadyProcessedError(Exception):
+    """Raised when a payment notification contradicts an already processed payment."""

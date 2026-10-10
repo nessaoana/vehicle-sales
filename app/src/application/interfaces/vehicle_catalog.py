@@ -24,3 +24,6 @@ class VehicleCatalog(Protocol):
 
     def get(self, vehicle_id: int) -> Vehicle | None:
         """Return a vehicle by its identifier, or None when it does not exist."""
+
+    def mark_as_sold(self, vehicle_id: int) -> None:
+        """Mark the vehicle as sold in vehicle-core."""

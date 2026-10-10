@@ -10,6 +10,7 @@ from sqlalchemy import Engine, create_engine
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
+from src.adapters.controllers.payment_controller import create_payment_router
 from src.adapters.controllers.sale_controller import create_sale_router
 from src.adapters.controllers.vehicle_controller import create_vehicle_router
 from src.application.exceptions.vehicle_catalog_exceptions import (
@@ -21,6 +22,7 @@ from src.application.use_case.list_vehicles import (
     ListAvailableVehiclesUseCase,
     ListSoldVehiclesUseCase,
 )
+from src.application.use_case.process_payment import ProcessPaymentUseCase
 from src.application.use_case.purchase_vehicle import PurchaseVehicleUseCase
 from src.infra.database.base import Base
 from src.infra.database.models import sale as _sale_model  # noqa: F401
@@ -108,6 +110,7 @@ def create_app(
         )
     )
     app.include_router(create_sale_router(PurchaseVehicleUseCase(sale_repository, vehicle_catalog)))
+    app.include_router(create_payment_router(ProcessPaymentUseCase(sale_repository, vehicle_catalog)))
     return app
 
 

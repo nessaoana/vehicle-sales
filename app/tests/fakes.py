@@ -48,12 +48,18 @@ class InMemoryVehicleCatalog:
     def get(self, vehicle_id: int) -> Vehicle | None:
         return self.vehicles.get(vehicle_id)
 
+    def mark_as_sold(self, vehicle_id: int) -> None:
+        self.vehicles[vehicle_id] = self.vehicles[vehicle_id].model_copy(update={"status": "sold"})
+
 
 class UnavailableVehicleCatalog:
     def search(self, status: str, filters: VehicleSearchFilters) -> list[Vehicle]:
         raise VehicleCatalogUnavailableError("connection refused")
 
     def get(self, vehicle_id: int) -> Vehicle | None:
+        raise VehicleCatalogUnavailableError("connection refused")
+
+    def mark_as_sold(self, vehicle_id: int) -> None:
         raise VehicleCatalogUnavailableError("connection refused")
 
 
