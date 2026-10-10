@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str = ""
     AWS_DEFAULT_REGION: str = "us-east-1"
     DEBUG: bool = False
+    VEHICLE_CORE_URL: str = "http://localhost:8081"
+    VEHICLE_CORE_TIMEOUT_SECONDS: float = 5.0
 
     model_config = SettingsConfigDict(
         env_file=DEFAULT_ENV_FILE,

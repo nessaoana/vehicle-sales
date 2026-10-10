@@ -8,8 +8,12 @@ class UnusedSaleRepository:
     pass
 
 
+class UnusedVehicleCatalog:
+    pass
+
+
 def test_health_endpoints_without_database() -> None:
-    client = TestClient(create_app(UnusedSaleRepository()))
+    client = TestClient(create_app(UnusedSaleRepository(), UnusedVehicleCatalog()))
 
     assert client.get("/health").json() == {"status": "ok"}
     assert client.get("/health/ready").json() == {"status": "ok", "database": "not_configured"}
@@ -37,7 +41,7 @@ def test_real_app_starts_without_database(monkeypatch, tmp_path) -> None:
 
 
 def test_database_errors_return_503() -> None:
-    app = create_app(UnusedSaleRepository())
+    app = create_app(UnusedSaleRepository(), UnusedVehicleCatalog())
 
     @app.get("/boom")
     def boom() -> None:
