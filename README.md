@@ -47,10 +47,86 @@ flowchart LR
 	UseCases --> Logging
 ```
 
-A comunicação com o `vehicle-core` acontece por HTTP. O serviço de vendas deve
-manter seu banco isolado e não acessar diretamente as tabelas do serviço
-principal. As pastas de adapters e application já estão preparadas para os
-casos de uso de compra, listagem e webhook de pagamento.
+A comunicação com o `vehicle-core` acontece por HTTP. O serviço de vendas tem
+banco próprio e não acessa as tabelas do serviço principal: os dados dos
+veículos são lidos do `vehicle-core` a cada listagem, e o banco `vehicle_sales`
+guarda apenas as vendas.
+
+## Fluxo de venda
+
+```mermaid
+sequenceDiagram
+	participant Cliente
+	participant Sales as vehicle-sales
+	participant Core as vehicle-core
+	participant Pagamento as Provedor de pagamento
+
+	Cliente->>Sales: GET /vehicles/available
+	Sales->>Core: GET /vehicles?status=available
+	Sales-->>Cliente: veículos sem venda em andamento, por preço
+	Cliente->>Sales: POST /sales (vehicle_id, CPF, data)
+	Sales->>Core: GET /vehicles/{id}
+	Sales-->>Cliente: venda pendente + payment_code
+	Pagamento->>Sales: POST /payments/webhook (payment_code, paid)
+	Sales->>Core: PATCH /vehicles/{id}/availability (sold)
+	Sales-->>Pagamento: venda confirmada
+```
+
+| Método | Rota | Descrição |
+|---|---|---|
+| `GET` | `/vehicles/available` | Veículos à venda, do mais barato para o mais caro |
+| `GET` | `/vehicles/sold` | Veículos vendidos, do mais barato para o mais caro |
+| `POST` | `/sales` | Compra: reserva o veículo e gera o código de pagamento |
+| `POST` | `/payments/webhook` | Confirma (`paid`) ou cancela (`cancelled`) o pagamento |
+| `GET` | `/health`, `/health/ready` | Processo disponível / processo e banco disponíveis |
+
+As listagens aceitam os filtros opcionais `brand`, `model`, `min_year` e
+`max_year`. Um veículo com venda pendente sai da listagem de disponíveis e não
+pode ser comprado de novo; se o pagamento for cancelado, ele volta a ficar
+disponível. A documentação interativa fica em `/docs`.
+
+## Desenvolvimento local
+
+O serviço depende do `vehicle-core` rodando. Com o core na porta `8081`, crie
+o `.env` a partir de `.env.example` e execute:
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r app/src/requirements.txt
+PYTHONPATH=app .venv/bin/pytest app/tests --cov=app/src --cov-report=term-missing --cov-fail-under=80
+PYTHONPATH=app .venv/bin/python -m uvicorn src.main:app --host 127.0.0.1 --port 8082 --reload
+```
+
+Com Docker, `docker compose up --build` sobe a API na porta `8000` com o
+PostgreSQL `vehicle_sales`. Dentro do container, o core é acessado em
+`http://host.docker.internal:8001`, a porta do container do `vehicle-core`.
+
+## Testando o fluxo
+
+Com os dois serviços rodando localmente:
+
+```bash
+# 1. Cadastra um veículo no vehicle-core
+curl -X POST http://127.0.0.1:8081/vehicles \
+	-H 'Content-Type: application/json' \
+	-d '{"license_plate": "ABC1D23", "brand": "Toyota", "model": "Corolla", "year": 2024, "price": "75000.00"}'
+
+# 2. Lista os veículos à venda
+curl 'http://127.0.0.1:8082/vehicles/available?brand=toyota'
+
+# 3. Compra o veículo; a resposta traz o payment_code
+curl -X POST http://127.0.0.1:8082/sales \
+	-H 'Content-Type: application/json' \
+	-d '{"vehicle_id": 1, "buyer_cpf": "529.982.247-25", "sale_date": "2026-10-10"}'
+
+# 4. Simula o provedor de pagamento confirmando a compra
+curl -X POST http://127.0.0.1:8082/payments/webhook \
+	-H 'Content-Type: application/json' \
+	-d '{"payment_code": "<payment_code>", "status": "paid"}'
+
+# 5. O veículo aparece entre os vendidos
+curl http://127.0.0.1:8082/vehicles/sold
+```
 
 ## CI/CD
 
