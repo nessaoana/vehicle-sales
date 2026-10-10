@@ -16,3 +16,6 @@ class SaleRepository(Protocol):
 
     def update(self, sale: CarSale) -> CarSale:
         """Update and return an existing sale."""
+
+    def reserved_vehicle_ids(self) -> set[int]:
+        """Return ids of vehicles with a pending or confirmed sale."""

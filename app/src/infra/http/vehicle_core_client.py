@@ -35,12 +35,27 @@ class VehicleCoreClient:
         )
         return [Vehicle.model_validate(item) for item in response.json()]
 
-    def _request(self, method: str, path: str, **kwargs: object) -> httpx2.Response:
+    def get(self, vehicle_id: int) -> Vehicle | None:
+        response = self._request("GET", f"/vehicles/{vehicle_id}", allow_not_found=True)
+        if response.status_code == httpx2.codes.NOT_FOUND:
+            return None
+        return Vehicle.model_validate(response.json())
+
+    def _request(
+        self,
+        method: str,
+        path: str,
+        *,
+        allow_not_found: bool = False,
+        **kwargs: object,
+    ) -> httpx2.Response:
         try:
             response = self._http.request(method, path, **kwargs)
+            if allow_not_found and response.status_code == httpx2.codes.NOT_FOUND:
+                return response
             response.raise_for_status()
         except httpx2.HTTPError as error:
-            logger.error(
+            logger.exception(
                 "vehicle_core_request_failed",
                 extra={"method": method, "path": path, "error": str(error)},
             )

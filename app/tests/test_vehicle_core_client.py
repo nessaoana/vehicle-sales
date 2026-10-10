@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 import httpx2
 import pytest
 
@@ -63,3 +65,20 @@ def test_search_raises_when_core_is_unreachable() -> None:
 
     with pytest.raises(VehicleCatalogUnavailableError):
         client_for(handler).search("available", VehicleSearchFilters())
+
+
+def test_get_returns_vehicle_or_none_when_missing() -> None:
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        if request.url.path == "/vehicles/1":
+            return httpx2.Response(200, json=CORE_VEHICLE)
+        return httpx2.Response(404, json={"detail": "Vehicle not found"})
+
+    client = client_for(handler)
+
+    assert client.get(1).price == Decimal("90000.00")
+    assert client.get(2) is None
+
+
+def test_get_raises_when_core_answers_with_error() -> None:
+    with pytest.raises(VehicleCatalogUnavailableError):
+        client_for(lambda request: httpx2.Response(503)).get(1)

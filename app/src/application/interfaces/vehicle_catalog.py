@@ -21,3 +21,6 @@ class VehicleCatalog(Protocol):
 
     def search(self, status: str, filters: VehicleSearchFilters) -> list[Vehicle]:
         """Return vehicles with the given status, ordered by price ascending."""
+
+    def get(self, vehicle_id: int) -> Vehicle | None:
+        """Return a vehicle by its identifier, or None when it does not exist."""

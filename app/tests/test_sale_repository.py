@@ -82,3 +82,14 @@ def test_sale_repository_rejects_missing_sales_on_update() -> None:
         repository.update(pending_sale().model_copy(update={"id": 999}))
     with pytest.raises(SaleNotFoundError):
         repository.update(pending_sale())
+
+
+def test_sale_repository_lists_reserved_vehicle_ids() -> None:
+    repository = build_repository()
+    repository.create(pending_sale(vehicle_id=1, payment_code="payment-1"))
+    confirmed = repository.create(pending_sale(vehicle_id=2, payment_code="payment-2"))
+    cancelled = repository.create(pending_sale(vehicle_id=3, payment_code="payment-3"))
+    repository.update(confirmed.model_copy(update={"payment_status": "paid", "sale_status": "confirmed"}))
+    repository.update(cancelled.model_copy(update={"payment_status": "cancelled", "sale_status": "cancelled"}))
+
+    assert repository.reserved_vehicle_ids() == {1, 2}

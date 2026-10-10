@@ -12,7 +12,7 @@ from src.application.exceptions.sale_exceptions import (
 )
 from src.domain.entitites.car_sales import CarSale
 from src.infra.database.mappers.sale_mapper import SaleMapper
-from src.infra.database.models.sale import SaleModel
+from src.infra.database.models.sale import ACTIVE_SALE_STATUSES, SaleModel
 
 
 logger = logging.getLogger("vehicle-sales")
@@ -57,3 +57,12 @@ class SqlAlchemySaleRepository:
             session.commit()
             session.refresh(model)
             return SaleMapper.to_entity(model)
+
+    def reserved_vehicle_ids(self) -> set[int]:
+        with self._session_factory() as session:
+            rows = (
+                session.query(SaleModel.vehicle_id)
+                .filter(SaleModel.sale_status.in_(ACTIVE_SALE_STATUSES))
+                .all()
+            )
+            return {vehicle_id for (vehicle_id,) in rows}
