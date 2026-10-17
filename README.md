@@ -157,19 +157,49 @@ Com o cluster criado pelo vehicle-core (`make localstack cluster` lá):
 ```bash
 make deploy                 # imagem nessaoana/vehicle-sales:main
 make deploy IMAGE_TAG=main-abc1234
+make smoke-test             # API no ar e conectada ao banco vehicle_sales
+make load-test GATEWAY_URL=$(make -sC ../vehicle-core gateway-url)  # HPA (requer hey)
 ```
+
+O fluxo completo de compra, com os dois serviços publicados, é testado no
+vehicle-core com `make e2e-test`.
 
 ## CI/CD
 
 ```mermaid
-flowchart LR
-	Push[Push ou PR] --> Tests[Build e testes<br/>cobertura ≥ 80%] --> Sonar[SonarCloud]
-	Push --> K8s[kubeconform]
-	Sonar --> Branch{Branch?}
-	K8s --> Branch
+flowchart TB
+	Push[Push em qualquer branch<br/>ou PR para main]
+
+	subgraph CI[CI · ci.yml]
+		Tests[Testes<br/>cobertura ≥ 80%] --> Sonar[SonarCloud<br/>quality gate]
+		K8sCheck[kubeconform<br/>+ bash -n nos scripts]
+	end
+
+	Push --> Tests
+	Push --> K8sCheck
+	Sonar & K8sCheck --> Branch{Branch?}
 	Branch -- outra --> PR[Abre PR para main]
-	Branch -- main --> Docker[Publica imagem<br/>no Docker Hub] --> Deploy[EKS no LocalStack<br/>deploy + smoke test]
+	PR -. merge .-> Main[main]
+	Branch -- main --> Main
+
+	subgraph CD[CD · cd.yml, após CI verde na main]
+		Docker[Build amd64 + arm64<br/>push vehicle-sales:main e :main-sha]
+		Docker --> LS[Sobe LocalStack Pro<br/>no runner]
+		LS --> TFApply[make cluster · terraform apply<br/>VPC, IAM, EKS + node group,<br/>API Gateway]
+		TFApply --> DSales[Deploy vehicle-sales<br/>imagem nova]
+		DSales --> Smoke[Smoke test do sales<br/>API + banco]
+	end
+
+	Main --> Docker
+	Infra[(infraestrutura compartilhada<br/>no repo vehicle-core:<br/>compose, infra/, kubeconfig)] -. checkout .-> LS
+	Docker -. push .-> Hub[(Docker Hub)]
 ```
+
+A infraestrutura é compartilhada e centralizada no
+[vehicle-core](https://github.com/nessaoana/vehicle-core#onde-o-terraform-é-usado):
+o CD faz checkout de lá só para subir o LocalStack e rodar o `make cluster`,
+que aplica o [`infra/`](https://github.com/nessaoana/vehicle-core/tree/main/infra)
+no runner. O vehicle-core em si não é publicado nem testado neste pipeline.
 
 O CI roda em pushes para qualquer branch e em PRs para `main`:
 
@@ -180,12 +210,11 @@ O CI roda em pushes para qualquer branch e em PRs para `main`:
 Se o CI passar:
 
 - **em outra branch**, um PR para `main` é aberto automaticamente;
-- **na `main`**, o CD publica a imagem `vehicle-sales:main-<sha>`, faz checkout
-  do vehicle-core para criar o cluster e o API Gateway, publica o vehicle-core
-  (`:main`) e a nova imagem do vehicle-sales e roda o smoke test ponta a ponta
-  pelo gateway.
+- **na `main`**, o CD publica a imagem `vehicle-sales:main-<sha>`, cria o
+  cluster e o API Gateway com a infraestrutura do vehicle-core, publica o
+  vehicle-sales e roda o smoke test do serviço (API no ar e conectada ao banco
+  `vehicle_sales`).
 
-O CD precisa dos mesmos secrets e variables do vehicle-core:
-`LOCALSTACK_AUTH_TOKEN`, `DOCKERHUB_TOKEN`, `CORE_POSTGRES_PASSWORD`,
-`SALES_POSTGRES_PASSWORD`, `DOCKERHUB_USERNAME` e, opcionalmente,
-`LOCALSTACK_POD`.
+O CD precisa destes secrets e variables:
+`LOCALSTACK_AUTH_TOKEN`, `DOCKERHUB_TOKEN`, `SALES_POSTGRES_PASSWORD`,
+`DOCKERHUB_USERNAME` e, opcionalmente, `LOCALSTACK_POD`.
