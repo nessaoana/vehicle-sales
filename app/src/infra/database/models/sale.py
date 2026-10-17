@@ -8,6 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from src.infra.database.base import Base
 
 
+ACTIVE_SALE_STATUSES = ("pending", "confirmed")
 ACTIVE_SALE_CONDITION = text("sale_status IN ('pending', 'confirmed')")
 
 

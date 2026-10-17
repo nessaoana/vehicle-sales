@@ -1,45 +1,13 @@
-from decimal import Decimal
-
 from fastapi.testclient import TestClient
 
-from src.application.exceptions.vehicle_catalog_exceptions import (
-    VehicleCatalogUnavailableError,
-)
 from src.application.interfaces.vehicle_catalog import VehicleSearchFilters
-from src.domain.entitites.vehicle import Vehicle
 from src.main import create_app
-
-
-class InMemorySaleRepository:
-    pass
-
-
-class InMemoryVehicleCatalog:
-    def __init__(self, vehicles: list[Vehicle]) -> None:
-        self.vehicles = vehicles
-        self.searches: list[tuple[str, VehicleSearchFilters]] = []
-
-    def search(self, status: str, filters: VehicleSearchFilters) -> list[Vehicle]:
-        self.searches.append((status, filters))
-        matches = [vehicle for vehicle in self.vehicles if vehicle.status == status]
-        return sorted(matches, key=lambda vehicle: vehicle.price)
-
-
-class UnavailableVehicleCatalog:
-    def search(self, status: str, filters: VehicleSearchFilters) -> list[Vehicle]:
-        raise VehicleCatalogUnavailableError("connection refused")
-
-
-def vehicle(vehicle_id: int, price: str, status: str = "available") -> Vehicle:
-    return Vehicle(
-        id=vehicle_id,
-        brand="Toyota",
-        model="Corolla",
-        year=2022,
-        color="Black",
-        price=Decimal(price),
-        status=status,
-    )
+from tests.fakes import (
+    InMemorySaleRepository,
+    InMemoryVehicleCatalog,
+    UnavailableVehicleCatalog,
+    vehicle,
+)
 
 
 def test_list_available_vehicles_returns_cheapest_first_and_forwards_filters() -> None:
@@ -66,6 +34,16 @@ def test_list_available_vehicles_returns_cheapest_first_and_forwards_filters() -
     assert catalog.searches == [
         ("available", VehicleSearchFilters(brand="toyota", model="corolla", min_year=2020, max_year=2024))
     ]
+
+
+def test_list_available_vehicles_hides_reserved_vehicles() -> None:
+    catalog = InMemoryVehicleCatalog([vehicle(1, "90000.00"), vehicle(2, "70000.00")])
+    client = TestClient(create_app(InMemorySaleRepository(), catalog))
+    client.post("/sales", json={"vehicle_id": 2, "buyer_cpf": "52998224725"})
+
+    response = client.get("/vehicles/available")
+
+    assert [item["id"] for item in response.json()] == [1]
 
 
 def test_list_sold_vehicles_returns_cheapest_first() -> None:
