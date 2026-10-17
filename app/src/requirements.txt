@@ -1,4 +1,4 @@
-fastapi>=0.100.0
+fastapi>=0.115.0
 uvicorn
 pytest
 pytest-cov
@@ -7,3 +7,4 @@ psycopg2-binary
 pydantic-settings
 dependency-injector
 python-json-logger
+httpx2

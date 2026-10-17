@@ -2,11 +2,11 @@ from src.infra.logging.formatter import LogConfig
 
 
 def test_logger_is_configured_once() -> None:
-    logger_config = LogConfig("vehicle-sales", "test")
+    logger_config = LogConfig("vehicle-sales-test", "test")
 
     first_logger = logger_config.get_logger()
     second_logger = logger_config.get_logger()
 
     assert first_logger is second_logger
-    assert first_logger.name == "vehicle-sales"
+    assert first_logger.name == "vehicle-sales-test"
     assert len(first_logger.handlers) == 1
