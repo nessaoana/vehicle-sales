@@ -1,0 +1,56 @@
+# Banco exclusivo do vehicle-sales. O Secret vehicle-sales-db (POSTGRES_USER e
+# POSTGRES_PASSWORD) é criado pelo deploy, fora do Git.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: vehicle-sales-db
+  labels:
+    app: vehicle-sales-db
+spec:
+  serviceName: vehicle-sales-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vehicle-sales-db
+  template:
+    metadata:
+      labels:
+        app: vehicle-sales-db
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: vehicle_sales
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          envFrom:
+            - secretRef:
+                name: vehicle-sales-db
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d vehicle_sales"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi

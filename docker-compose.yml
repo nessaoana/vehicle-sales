@@ -15,8 +15,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      localstack:
-        condition: service_healthy
     restart: unless-stopped
 
   postgres:
@@ -38,28 +36,5 @@ services:
       timeout: 5s
       retries: 5
 
-  localstack:
-    image: localstack/localstack:latest
-    container_name: vehicle-sales-localstack
-    ports:
-      - "4566:4566"
-    environment:
-      SERVICES: ${LOCALSTACK_SERVICES:-s3}
-      DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
-      DEBUG: ${DEBUG:-0}
-      PERSISTENCE: ${LOCALSTACK_PERSISTENCE:-1}
-      AUTH_TOKEN: ${LOCALSTACK_AUTH_TOKEN:-}
-    volumes:
-      - localstack_data:/var/lib/localstack
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./infra/localstack-init:/etc/localstack/init/ready.d
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 15s
-
 volumes:
   postgres_data:
-  localstack_data:
