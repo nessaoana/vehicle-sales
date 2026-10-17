@@ -162,14 +162,40 @@ make deploy IMAGE_TAG=main-abc1234
 ## CI/CD
 
 ```mermaid
-flowchart LR
-	Push[Push ou PR] --> Tests[Build e testes<br/>cobertura ≥ 80%] --> Sonar[SonarCloud]
-	Push --> K8s[kubeconform]
-	Sonar --> Branch{Branch?}
-	K8s --> Branch
+flowchart TB
+	Push[Push em qualquer branch<br/>ou PR para main]
+
+	subgraph CI[CI · ci.yml]
+		Tests[Testes<br/>cobertura ≥ 80%] --> Sonar[SonarCloud<br/>quality gate]
+		K8sCheck[kubeconform<br/>+ bash -n nos scripts]
+	end
+
+	Push --> Tests
+	Push --> K8sCheck
+	Sonar & K8sCheck --> Branch{Branch?}
 	Branch -- outra --> PR[Abre PR para main]
-	Branch -- main --> Docker[Publica imagem<br/>no Docker Hub] --> Deploy[EKS no LocalStack<br/>deploy + smoke test]
+	PR -. merge .-> Main[main]
+	Branch -- main --> Main
+
+	subgraph CD[CD · cd.yml, após CI verde na main]
+		Docker[Build amd64 + arm64<br/>push vehicle-sales:main e :main-sha]
+		Docker --> LS[Sobe LocalStack Pro<br/>no runner]
+		LS --> TFApply[make cluster · terraform apply<br/>VPC, IAM, EKS + node group,<br/>API Gateway]
+		TFApply --> DCore[Deploy vehicle-core<br/>imagem :main]
+		DCore --> DSales[Deploy vehicle-sales<br/>imagem nova]
+		DSales --> Smoke[Smoke test<br/>pelo API Gateway]
+	end
+
+	Main --> Docker
+	CoreRepo[(repo vehicle-core<br/>compose, infra/ Terraform,<br/>k8s/, Makefile, smoke test)] -. checkout .-> LS
+	Hub[(Docker Hub)] -. vehicle-core:main .-> DCore
+	Docker -. push .-> Hub
 ```
+
+O Terraform não fica neste repositório: o CD faz checkout do
+[vehicle-core](https://github.com/nessaoana/vehicle-core#onde-o-terraform-é-usado)
+e roda o `make cluster` de lá, que aplica o [`infra/`](https://github.com/nessaoana/vehicle-core/tree/main/infra)
+no LocalStack do runner.
 
 O CI roda em pushes para qualquer branch e em PRs para `main`:
 
