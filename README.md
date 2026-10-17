@@ -128,28 +128,64 @@ curl -X POST http://127.0.0.1:8082/payments/webhook \
 curl http://127.0.0.1:8082/vehicles/sold
 ```
 
+## Infraestrutura
+
+No ambiente publicado (LocalStack Pro), o vehicle-sales roda no cluster EKS
+`vehicle-cluster`, que é criado pelo repositório
+[vehicle-core](https://github.com/nessaoana/vehicle-core#infraestrutura) junto
+com o API Gateway. Este repositório só contém o que é do serviço de vendas:
+
+| Caminho | Conteúdo |
+|---|---|
+| [`k8s/`](k8s/) | Namespace `vehicle-sales`, Postgres próprio (StatefulSet), Deployment, Service, HPA e Ingress |
+| [`scripts/deploy.sh`](scripts/deploy.sh) | Cria o Secret do banco, aplica os manifestos e espera o rollout |
+
+- **Banco isolado**: o Postgres `vehicle_sales` roda no namespace do serviço e
+  só guarda as vendas.
+- **Comunicação com o core**: HTTP pelo DNS do cluster
+  (`VEHICLE_CORE_URL=http://vehicle-core-api.vehicle-core.svc.cluster.local:8000`,
+  no [ConfigMap](k8s/api-configmap.yaml)).
+- **Autoscaling**: o HPA mantém de 2 a 6 réplicas (CPU 60% ou memória 75%),
+  para absorver picos de listagem e compra.
+- **Exposição pública**: `GET /vehicles/available`, `GET /vehicles/sold`,
+  `POST /sales` e `POST /payments/webhook` passam pelo API Gateway e pelo load
+  balancer (Traefik). O Ingress deste serviço tem prioridade sobre o prefixo
+  `/vehicles` do core.
+
+Com o cluster criado pelo vehicle-core (`make localstack cluster` lá):
+
+```bash
+make deploy                 # imagem nessaoana/vehicle-sales:main
+make deploy IMAGE_TAG=main-abc1234
+```
+
 ## CI/CD
 
 ```mermaid
 flowchart LR
 	Push[Push ou PR] --> Tests[Build e testes<br/>cobertura ≥ 80%] --> Sonar[SonarCloud]
-	Push --> Plan[Terraform<br/>validate + plan]
+	Push --> K8s[kubeconform]
 	Sonar --> Branch{Branch?}
-	Plan --> Branch
+	K8s --> Branch
 	Branch -- outra --> PR[Abre PR para main]
-	Branch -- main --> Docker[Publica imagem<br/>no Docker Hub] --> Apply[Terraform apply<br/>no LocalStack]
+	Branch -- main --> Docker[Publica imagem<br/>no Docker Hub] --> Deploy[EKS no LocalStack<br/>deploy + smoke test]
 ```
 
 O CI roda em pushes para qualquer branch e em PRs para `main`:
 
 - build e testes, com cobertura mínima de 80%;
 - análise no SonarCloud, que bloqueia a alteração se o quality gate falhar;
-- `terraform fmt`, `validate` e `plan`, sem apply.
+- validação dos manifestos Kubernetes com `kubeconform`.
 
 Se o CI passar:
 
 - **em outra branch**, um PR para `main` é aberto automaticamente;
-- **na `main`**, o CD publica a imagem no Docker Hub e aplica o Terraform no
-  LocalStack Cloud.
+- **na `main`**, o CD publica a imagem `vehicle-sales:main-<sha>`, faz checkout
+  do vehicle-core para criar o cluster e o API Gateway, publica o vehicle-core
+  (`:main`) e a nova imagem do vehicle-sales e roda o smoke test ponta a ponta
+  pelo gateway.
 
-Os jobs usam os workflows reutilizáveis de `fiap-soat-grupo36/reusable-actions`.
+O CD precisa dos mesmos secrets e variables do vehicle-core:
+`LOCALSTACK_AUTH_TOKEN`, `DOCKERHUB_TOKEN`, `CORE_POSTGRES_PASSWORD`,
+`SALES_POSTGRES_PASSWORD`, `DOCKERHUB_USERNAME` e, opcionalmente,
+`LOCALSTACK_POD`.

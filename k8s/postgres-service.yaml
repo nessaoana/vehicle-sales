@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: vehicle-sales-db
+  labels:
+    app: vehicle-sales-db
+spec:
+  clusterIP: None
+  selector:
+    app: vehicle-sales-db
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
